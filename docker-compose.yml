@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  ffmpeg-capture:
+    build: ./capture
+    container_name: ffmpeg_capture
+    volumes:
+      - ./output:/timelapse
+    environment:
+      - RTSP_URL=${RTSP_URL}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    mem_limit: 100m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep ffmpeg || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frame-rotator:
+    build: ./rotator
+    container_name: frame_rotator
+    volumes:
+      - ./output:/timelapse
+    depends_on:
+      - ffmpeg-capture
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    mem_limit: 32m
+    cpus: 0.25
+
+  watchdog:
+    image: buanet/watchdog:latest
+    container_name: watchdog
+    restart: always
+    environment:
+      - WATCHDOG_CONTAINER_LABEL=all
+    mem_limit: 16m
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
